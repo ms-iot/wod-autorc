@@ -1,0 +1,224 @@
+// Main.cpp : Defines the entry point for the console application.
+//
+
+
+#include "stdafx.h"
+#include "arduino.h"
+
+#define LEFT_SENSOR 0
+#define RIGHT_SENSOR 2
+#define FWD_SENSOR 1
+
+//define pins
+const int OUT_RIGHT = 10;
+const int OUT_UP = 6;
+const int OUT_LEFT = 11;
+const int OUT_DOWN = 5;
+
+const int SENSORS[] = { A0, A1, A2, A3, A4, A5 };
+int SPEED_HISTORY[500];
+int READINGS[] = { 0, 0, 0, 0, 0, 0 };
+int loopcount, tickcount = 0;
+
+enum DRIVING_STATES { STRAIGHTAWAY, REVERSE, CAUTIOUS };
+
+DRIVING_STATES current_state = STRAIGHTAWAY;
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	return RunArduinoSketch();
+}
+
+
+/* Setup Arduino function */
+void setup()
+{
+	
+	//set motor pins to output mode
+	pinMode(OUT_UP, OUTPUT);
+	pinMode(OUT_RIGHT, OUTPUT);
+	pinMode(OUT_DOWN, OUTPUT);
+	pinMode(OUT_LEFT, OUTPUT);
+
+	//set pin outputs to low
+	digitalWrite(OUT_UP, LOW);
+	digitalWrite(OUT_RIGHT, LOW);
+	digitalWrite(OUT_DOWN, LOW);
+	digitalWrite(OUT_LEFT, LOW);
+
+	analogWrite(OUT_DOWN, 0);
+	analogWrite(OUT_UP, 0);
+	analogWrite(OUT_LEFT, 0);
+	analogWrite(OUT_RIGHT, 0);
+
+	for (int i = 0; i < 3; i++)
+	{
+		pinMode(SENSORS[i], INPUT);
+	}
+
+	analogReadResolution(10);
+
+	loopcount = 0;
+	tickcount = 0;
+
+	for (int i = 0; i < 500; i++)
+	{
+		SPEED_HISTORY[i] = 255;
+	}
+}
+
+void driveForward(int speed)
+{
+	analogWrite(OUT_UP, speed);
+	analogWrite(OUT_DOWN, 0);
+}
+
+void driveBackward(int speed)
+{
+	analogWrite(OUT_UP, 0);
+	analogWrite(OUT_DOWN, speed);
+}
+
+void turnLeft()
+{
+	analogWrite(OUT_LEFT, 255);
+	analogWrite(OUT_RIGHT, 0);
+}
+
+void turnRight()
+{
+	analogWrite(OUT_RIGHT, 255);
+	analogWrite(OUT_LEFT, 0);
+}
+
+void turnStraight()
+{
+	analogWrite(OUT_RIGHT, 0);
+	analogWrite(OUT_LEFT, 0);
+}
+
+void straightawayDriving()
+{
+	//get FWD reading
+	int speed = 550 - READINGS[1];
+	speed = (512.0 / 200.0)*speed - 263.93;
+	SPEED_HISTORY[tickcount] = abs(speed);
+	if (speed > 0){
+		driveForward(min(speed, 125));
+	}
+	else
+	{
+		driveBackward(min(125, abs(speed)));
+	}
+
+
+	if (READINGS[LEFT_SENSOR] > 250 
+		&& READINGS[LEFT_SENSOR] > READINGS[RIGHT_SENSOR])
+	{
+		turnRight();
+	}
+	else if (READINGS[RIGHT_SENSOR] > 250 
+		&& READINGS[LEFT_SENSOR] < READINGS[RIGHT_SENSOR])
+	{
+		turnLeft();
+	}
+	else if (READINGS[RIGHT_SENSOR] < 250 && READINGS[LEFT_SENSOR] < 250)
+	{
+		turnStraight();
+	}
+}
+
+void reverseDriving()
+{
+	//get FWD reading
+	int speed = 550 - READINGS[1];
+	speed = (255.0 / 200.0)*speed - 263.93;
+	SPEED_HISTORY[tickcount] = abs(speed);
+	if (speed > 0){
+	//	driveForward(min(speed, 125));
+	}
+	else
+	{
+//		driveBackward(min(125, abs(speed)));
+	}
+
+
+	if (READINGS[LEFT_SENSOR] > READINGS[RIGHT_SENSOR])
+	{
+		turnLeft();
+	}
+	else if (READINGS[LEFT_SENSOR] < READINGS[RIGHT_SENSOR])
+	{
+		turnRight();
+	}
+	else
+	{
+		turnStraight();
+	}
+}
+
+//Loop Arduino function
+void loop()
+{
+	for (int i = 0; i < 3; i++)
+	{
+		READINGS[i] += analogRead(SENSORS[i]);
+	}
+	//every 10 loops average the readings and do something
+	if (loopcount != 0 && loopcount % 5 == 0)
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			READINGS[i] = READINGS[i] / loopcount;
+			//Log(L"Sensor %d : %d \t", i, READINGS[i]);
+		}
+		//Log(L"\n");
+
+
+		if (tickcount > 500)
+		{
+			current_state = REVERSE;
+			for (int i = 0; i < 500; i++)
+			{
+				if (SPEED_HISTORY[i] > 100)
+				{
+					current_state = STRAIGHTAWAY;
+				}
+			}
+		
+
+			tickcount = 0;
+		}
+
+		switch (current_state)
+		{
+		case STRAIGHTAWAY:
+			straightawayDriving();
+			Log(L"Straightaway\n");
+			break;
+		case REVERSE:
+			reverseDriving();
+			Log(L"Reverse\n");
+			break;
+		default:
+			break;
+		}
+	//	straightawayDriving();
+
+		for (int i = 0; i < 3; i++)
+		{
+			READINGS[i] = 0;
+		}
+
+
+		loopcount = 0;
+
+		tickcount++;
+	}
+
+
+
+	loopcount++;
+
+}
+

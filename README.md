@@ -63,6 +63,7 @@ You'll want to connect one end of the photoresistor to both a 10kOhm resistor an
 
 If you're unclear about any of the instructions above, check out the Fritzing diagram below. 
 
+![Windows On Devices - AutoRC Wiring](/images/AutoRC_bb.png "Windows On Devices - AutoRC Wiring")
 
 Once you've got this all wired up, we're ready to start programming the brain behind our car!
 
@@ -174,3 +175,17 @@ If you're having trouble wrapping your head around what the median filter does, 
 
 If you want to play around with this data, you can see the JavaScript snippet that we used to generate the example data, available in example-snippets/.
 
+##1. Front/Back Controll (PID)
+
+PID controllers (Proportional-Integral-Derivative), if you've never heard of them, are some of the most commonly implemented controllers in existence. PID Controllers can be found in the guts of nuclear reactors, heating and cooling systems, toys, robots, military helicopters and jets, and so much more. 
+
+For the following section, we'll use our Auto-RC Car as the basis for our discussion. We'll assume that our sensor value is the forward reading of the infared sensor, and we'll say that in the ideal case, a reading of 300 correlates to an acceptable distance from the wall.
+
+In essence, PID controllers work by looking sensor readings and comparing them to an ideal value. In this case, our ideal value is 300. This error value is then used to determine how to control the device in the following way:
+
+1. Proportional
+  This part works by looking at how far the sensor value is from the ideal value right now. If the sensor is reading 400, and we want it to read 300, that means our error is 100. The speed at which we drive the motors would then be dictated by this error rate.
+2. Integral
+  This part looks at the history of the error values. For example, if our sensor value is changing slowly, the car might start to speed up to compensate for the fact that our error isn't being fixed fast enough.
+3. Derivative
+  This part looks at how the error is changing. Imagine that our sensor values are approaching our ideal value faster and faster. If this is happening too fast, we might hit a wall! The derivative term kicks in when the error changes, and it's effect is proportional to the rate of that change.

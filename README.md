@@ -216,4 +216,8 @@ Finally, we played with the derivative term. This term dictates how quickly the 
 
 You might notice that the blue line gets to the steady-state (i.e., non-changing error) slightly faster than the orange line (which has a smaller derivative term). Depending on your setup, you might not see a huge effect from the derivative term, and it's one of the hardest terms to tune by hand, so we decided to keep it fairly small.
 
+Here's the response of the car, based on the final parameters we chose.
+
+![Final Car Behaviour](/images/final.png "Final Car Behaviour")
+
 At the end of the day, parameter tuning is a very challenging problem, especially when batteries start to drain, or when conditions change. We'd love to see what solutions you come up with -- whether it be an algorithm that auto-tunes your parameters, or a car that can detect conditions and use different parameter presets automatically! 

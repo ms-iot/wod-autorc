@@ -189,3 +189,31 @@ In essence, PID controllers work by looking sensor readings and comparing them t
   This part looks at the history of the error values. For example, if our sensor value is changing slowly, the car might start to speed up to compensate for the fact that our error isn't being fixed fast enough.
 3. Derivative
   This part looks at how the error is changing. Imagine that our sensor values are approaching our ideal value faster and faster. If this is happening too fast, we might hit a wall! The derivative term kicks in when the error changes, and it's effect is proportional to the rate of that change.
+
+You can take a look at our PID implementation in PID.cpp and PID.h. This is heavily inspired by Bret Beauregard's work with the Arduino PID library. You should check out [his blog](http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/) on the topic to learn more about how it works.
+
+An important part of implementing a PID controller is the process of turning parameters. In other words, deciding how big of a factor the Proportional, Integral, and Derivative portions will play moving forward. 
+
+[Wikipedia](http://en.wikipedia.org/wiki/PID_controller) has a good table which discusses the effect of each parameter. You'll have to figure out good values to use based on the flooring of your home, the torque of your motors, and the changing power output of your battery. Below are three charts which compare the response of the car at different parameter settings. The "Output" value indicates how strong the motor is being driven - with 255 being max forward and -255 being max backward. The error indicates how far the car is away from the ideal point away from the wall, based on how we implemented this, that's about 30cm away.
+
+The proportional component is the first big parameter to tune. This has a big impact on how fast your car will move and respond to changes. 
+
+![Varying The Proportional Term](/images/kp-varies.png "Varying The Proportional Term")
+
+You can see that when the proportional input is higher (the blue line) we get a faster response, and a final value that has less error. The downside is we get more oscillations -- when the car gets close to the goal, it'll bounce back and forth for a while before settling down. 
+
+Personally, we wanted our car to drive smooth, even if that meant it was a bit slower. It didn't really matter to us how far it stopped from the wall, only that it stopped before hitting it. Because of this, we decided to go with a smaller proprtional factor. You might decide to use something different. 
+
+Second, we tuned the integral parameter. This parameter helps to reduce the final error, and speeds up the response.
+
+![Varying The Integral Term](/images/ki-varies.png "Varying the Integral Term") 
+
+You might notice we picked very small values for this parameter. There's a reason for that. Because most of the time, the car is ideally powering down a hallway, having a high integral term would mean that it keeps going faster and faster and faster, and would eventually be very hard to correct. In order to deal with this issue, we used both a small integral term, and we placed a hard limit to how much the integral term could affect the speed of the car (check out PID.cpp).
+
+Finally, we played with the derivative term. This term dictates how quickly the controller reacts to change. 
+
+![Varying The Derivative Term](/images/kd-varies.png "Varying The Derivative Term")
+
+You might notice that the blue line gets to the steady-state (i.e., non-changing error) slightly faster than the orange line (which has a smaller derivative term). Depending on your setup, you might not see a huge effect from the derivative term, and it's one of the hardest terms to tune by hand, so we decided to keep it fairly small.
+
+At the end of the day, parameter tuning is a very challenging problem, especially when batteries start to drain, or when conditions change. We'd love to see what solutions you come up with -- whether it be an algorithm that auto-tunes your parameters, or a car that can detect conditions and use different parameter presets automatically! 

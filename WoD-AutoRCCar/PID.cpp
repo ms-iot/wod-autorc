@@ -1,5 +1,9 @@
 #include "PID.h"
 #include "arduino.h"
+#include <vector>
+#include <iostream>
+#include <fstream>
+
 PID::PID()
 {
 	state.readingPrev = 0;
@@ -25,11 +29,12 @@ void PID::updateResponse(float reading)
 {
 	unsigned long currentTime = millis();
 
-	if (!(currentTime - state.lastSampleTime) >= params.delT)
+	if (!((currentTime - state.lastSampleTime) >= params.delT))
 	{
 		//delta of 10ms has not yet occurred, don't recompute
 		return;
 	}
+	state.lastSampleTime = currentTime;
 
 	float err = reading - params.setpt;
 	float pidout = 0;
@@ -60,11 +65,12 @@ void PID::updateResponse(float reading)
 	//clamp output to -255 to 255
 	if (pidout > 255)
 	{
-		pidout = 255;
+		return;
 	}
 	else if (pidout < -255)
 	{
-		pidout = -255;
+		return;
 	}
 	state.output = pidout;
+
 }

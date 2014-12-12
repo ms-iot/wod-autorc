@@ -64,9 +64,9 @@ void setup()
 	}
 
 	controller.params.delT = 10;
-	controller.params.Kp = 0.50;
-	controller.params.Ki = 0.0050;
-	controller.params.Kd = 0.9;
+	controller.params.Kp = 1.0;
+	controller.params.Ki = 0.00;
+	controller.params.Kd = 0.00;
 	controller.params.setpt = 250;
 
 	analogReadResolution(10);
@@ -111,7 +111,6 @@ void stuckDetection()
 	wheel_reading++;
 
 	//check if we're stuck, if so change the state to backward
-
 	if (wheel_reading == 1000)
 	{
 		wheel_reading = 0;
@@ -134,12 +133,10 @@ void stuckDetection()
 			//if there's space to reverse, go backwards, otherwise go forward
 			if (state == FORWARD)
 			{
-				//Log(L"State changed from FWD to RVS\n");
 				state = BACKWARD;
 			}
 			else
 			{
-				//Log(L"State changed from RVS to FWD\n");
 				state = FORWARD;
 			}
 			direction = rand() / 10922.0;
@@ -156,7 +153,6 @@ void drive()
 
 	if (state == BACKWARD)
 	{
-		controller.updateResponse(1.0 * READINGS[REAR_SENSOR]);
 		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
 		{
 			turnStraight();
@@ -190,6 +186,8 @@ void drive()
 	}
 	else
 	{
+
+		/*
 		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
 		{
 			turnStraight();
@@ -208,7 +206,13 @@ void drive()
 		{
 			turnStraight();
 		}
-		controller.updateResponse(1.0 * READINGS[FWD_SENSOR]);
+		*/
+	}
+	controller.updateResponse(1.0 * READINGS[FWD_SENSOR]);
+	if (controller.state.output == -1000)
+	{
+		driveForward(0);
+		exit(1);
 	}
 
 	if (controller.state.output > 0)
@@ -283,7 +287,7 @@ void loop()
 	drive();
 	//Log(L"Speed: %f \n", controller.state.output);
 	
-	
+
 
 }
 

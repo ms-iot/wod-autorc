@@ -1,7 +1,3 @@
-// Copyright(c) Microsoft Open Technologies, Inc. All rights reserved.
-// Licensed under the BSD 2 - Clause License.
-// See License.txt in the project root for license information.
-
 // Main.cpp : Defines the entry point for the console application.
 //
 
@@ -17,13 +13,22 @@
 #define REAR_SENSOR 4
 
 //define pins
-const int OUT_RIGHT = 11;
-const int OUT_UP = 6;
-const int OUT_LEFT = 10;
-const int OUT_DOWN = 5;
+#define  OUT_RIGHT 11
+#define  OUT_UP 6
+#define  OUT_LEFT 10
+#define  OUT_DOWN 5
+
+//constants
+#define WREADING_BUF_SIZE 1000
+#define WREADING_THRESHOLD 30
+#define TURN_THRESHOLD 80
+#define TURN_BOUNDARY 300
+#define THROTTLE_THRESHOLD 80
+#define SENSOR_COUNT 6
+#define RAND_TRIPLICATOR 10922.0
 
 const int SENSORS[] = { A0, A1, A2, A3, A4, A5 };
-int WHEEL_READINGS[1000];
+int WHEEL_READINGS[WREADING_BUF_SIZE];
 int READINGS[] = { 0, 0, 0, 0, 0, 0 };
 
 PID controller;
@@ -33,7 +38,7 @@ int averaging = 0;
 
 enum DRIVING_STATE { FORWARD, BACKWARD };
 
-DRIVING_STATE state, oldstate;
+DRIVING_STATE state;
 bool stopped = false;
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -69,8 +74,8 @@ void setup()
 
 	controller.params.delT = 10;
 	controller.params.Kp = 1.0;
-	controller.params.Ki = 0.00;
-	controller.params.Kd = 0.00;
+	controller.params.Ki = 0.005;
+	controller.params.Kd = 0.5;
 	controller.params.setpt = 250;
 
 	analogReadResolution(10);
@@ -115,17 +120,15 @@ void stuckDetection()
 	wheel_reading++;
 
 	//check if we're stuck, if so change the state to backward
-	if (wheel_reading == 1000)
+	if (wheel_reading == WREADING_BUF_SIZE)
 	{
 		wheel_reading = 0;
 		int first_reading = WHEEL_READINGS[0];
-		oldstate = state;
-		state = oldstate;
 		stopped = true;
-		for (int i = 1; i < 1000; i++)
+		for (int i = 1; i < WREADING_BUF_SIZE; i++)
 		{
-			if (WHEEL_READINGS[i] > first_reading + 30
-				|| WHEEL_READINGS[i] < first_reading - 30)
+			if (WHEEL_READINGS[i] > first_reading + WREADING_THRESHOLD
+				|| WHEEL_READINGS[i] < first_reading - WREADING_THRESHOLD)
 			{
 				stopped = false;
 				break;
@@ -143,7 +146,7 @@ void stuckDetection()
 			{
 				state = FORWARD;
 			}
-			direction = rand() / 10922.0;
+			direction = rand() / RAND_TRIPLICATOR;
 			controller.reverseControllerMode();
 
 		}
@@ -157,17 +160,19 @@ void drive()
 
 	if (state == BACKWARD)
 	{
-		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
+		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < TURN_THRESHOLD)
 		{
 			turnStraight();
 		}
-		else if (READINGS[LEFT_SENSOR] > 300
-			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 100))
+		else if (READINGS[LEFT_SENSOR] > TURN_BOUNDARY
+			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - TURN_THRESHOLD)
+			&& abs(controller.state.output) > THROTTLE_THRESHOLD)
 		{
 			turnLeft();
 		}
-		else if (READINGS[RIGHT_SENSOR] > 300
-			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 100))
+		else if (READINGS[RIGHT_SENSOR] > TURN_BOUNDARY
+			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - TURN_THRESHOLD)
+			&& abs(controller.state.output) > THROTTLE_THRESHOLD)
 		{
 			turnRight();
 		}
@@ -187,22 +192,27 @@ void drive()
 				turnStraight();
 			}
 		}
+
+
+		controller.updateResponse(1.0 * READINGS[REAR_SENSOR]);
 	}
 	else
 	{
 
-		/*
-		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
+		
+		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < TURN_THRESHOLD)
 		{
 			turnStraight();
 		}
-		else if (READINGS[LEFT_SENSOR] > 250
-			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 80))
+		else if (READINGS[LEFT_SENSOR] > TURN_BOUNDARY
+			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - TURN_THRESHOLD)
+			&& abs(controller.state.output) > THROTTLE_THRESHOLD)
 		{
 			turnRight();
 		}
-		else if (READINGS[RIGHT_SENSOR] > 250
-			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 80 ))
+		else if (READINGS[RIGHT_SENSOR] > TURN_BOUNDARY
+			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - TURN_THRESHOLD)
+			&& abs(controller.state.output) > THROTTLE_THRESHOLD)
 		{
 			turnLeft();
 		}
@@ -210,13 +220,9 @@ void drive()
 		{
 			turnStraight();
 		}
-		*/
-	}
-	controller.updateResponse(1.0 * READINGS[FWD_SENSOR]);
-	if (controller.state.output == -1000)
-	{
-		driveForward(0);
-		exit(1);
+
+		controller.updateResponse(1.0 * READINGS[FWD_SENSOR]);
+		
 	}
 
 	if (controller.state.output > 0)
@@ -241,13 +247,13 @@ int compare_ints(const void* a, const void* b)   // comparison function
 void medianFilter()
 {
 	static const size_t FRAME_SIZE = 20;
-	static int data[6][FRAME_SIZE];
-	static int sorted_data[6][FRAME_SIZE];
+	static int data[SENSOR_COUNT][FRAME_SIZE];
+	static int sorted_data[SENSOR_COUNT][FRAME_SIZE];
 	static size_t data_size = 0;
 
 	//shift data
 	data_size = min(FRAME_SIZE, data_size + 1);
-	for (int n = 0; n < 5; n++)
+	for (int n = 0; n < SENSOR_COUNT; n++)
 	{
 		for (int i = data_size - 1; i > 0; i--) {
 			data[n][i] = data[n][i - 1];
@@ -255,33 +261,30 @@ void medianFilter()
 	}
 
 	//add in new value
-	for (int n = 0; n < 5; n++)
+	for (int n = 0; n < SENSOR_COUNT; n++)
 	{
 		data[n][0] = READINGS[n];
 	}
 
 	// Create a sorted array
-	for (int n = 0; n < 5; n++)
+	for (int n = 0; n < SENSOR_COUNT; n++)
 	{
 		memcpy(sorted_data[n], data[n], data_size * sizeof(int));
 		std::qsort(sorted_data[n], data_size, sizeof(int), compare_ints);
 	}
 
 	// Get median
-	for (int n = 0; n < 5; n++)
+	for (int n = 0; n < SENSOR_COUNT; n++)
 	{
 		READINGS[n] = sorted_data[n][data_size / 2];
-
-	//	Log(L"%d: %d \t", n, READINGS[n]);
  	}
-//	Log(L"\n");
 }
 
 
 //Loop Arduino function
 void loop()
 {
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < SENSOR_COUNT; i++)
 	{
 		READINGS[i] = analogRead(SENSORS[i]);
 	}
@@ -289,7 +292,6 @@ void loop()
 	medianFilter();
 	stuckDetection();
 	drive();
-	//Log(L"Speed: %f \n", controller.state.output);
 	
 
 

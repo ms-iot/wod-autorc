@@ -136,43 +136,43 @@ Next, lets take a look at what our sketch's loop() function will look like:
 Our main logic loop is simple: read our sensors, run the values through a median filter to make sure we throw out noise and outliers, and then drive the car appropriately (depending on whether we are stuck or not).
 
 Before moving on, we'll take a quick look at how the simple median filter works.
+```cpp
+void medianFilter()
+{
+	static const size_t FRAME_SIZE = 20;
+	static int data[SENSOR_COUNT][FRAME_SIZE];
+	static int sorted_data[SENSOR_COUNT][FRAME_SIZE];
+	static size_t data_size = 0;
 
-	void medianFilter()
+	//shift data
+	data_size = min(FRAME_SIZE, data_size + 1);
+	for (int n = 0; n < SENSOR_COUNT; n++)
 	{
-		static const size_t FRAME_SIZE = 20;
-		static int data[6][FRAME_SIZE];
-		static int sorted_data[6][FRAME_SIZE];
-		static size_t data_size = 0;
-	
-		//shift data
-		data_size = min(FRAME_SIZE, data_size + 1);
-		for (int n = 0; n < 5; n++)
-		{
-			for (int i = data_size - 1; i > 0; i--) {
-				data[n][i] = data[n][i - 1];
-			}
+		for (int i = data_size - 1; i > 0; i--) {
+			data[n][i] = data[n][i - 1];
 		}
-	
-		//add in new value
-		for (int n = 0; n < 5; n++)
-		{
-			data[n][0] = READINGS[n];
-		}
-	
-		// Create a sorted array
-		for (int n = 0; n < 5; n++)
-		{
-			memcpy(sorted_data[n], data[n], data_size * sizeof(int));
-			std::qsort(sorted_data[n], data_size, sizeof(int), compare_ints);
-		}
-	
-		// Get median
-		for (int n = 0; n < 5; n++)
-		{
-			READINGS[n] = sorted_data[n][data_size / 2];
-	 	}
 	}
 
+	//add in new value
+	for (int n = 0; n < SENSOR_COUNT; n++)
+	{
+		data[n][0] = READINGS[n];
+	}
+
+	// Create a sorted array
+	for (int n = 0; n < SENSOR_COUNT; n++)
+	{
+		memcpy(sorted_data[n], data[n], data_size * sizeof(int));
+		std::qsort(sorted_data[n], data_size, sizeof(int), compare_ints);
+	}
+
+	// Get median
+	for (int n = 0; n < SENSOR_COUNT; n++)
+	{
+		READINGS[n] = sorted_data[n][data_size / 2];
+ 	}
+}
+```
 First, we define a frame size for each variable. Here, we use a frame size of 20 for each reading. That means the median filter will return the median value out of the last 20 readings.  It does this by sorting the list of values and returning the one in the middle. This is a way of averaging out readings, and should eliminate a lot of sensor noise and spikes, allowing for smoother control.
 
 If you're having trouble wrapping your head around what the median filter does, take a look at the following two graphs. The first is a graph of a line ( y = x ) multiplied with a random value between 0.85 and 1.5. You can see a lot of spikes in the graph. The second graph is the same data, passed through a median filter with a frame size of 10. As you can see, the second graph still maintains the general response, but filters out many of the spikes (which if used as data to drive a controller would result in weird behavior).
@@ -233,105 +233,121 @@ At the end of the day, parameter tuning is a very challenging problem, especiall
 Steering is pretty straightforward. We compare the value of one of the L/R sensors with that of the other. If one of them is big enough, and there's enough clearance to turn (i.e., one of them is small, the other is big), and the car is actually moving (no point turning the wheels if we're stopped), then we turn in the appropriate direction.
 
 There's also a check to see if we're moving forwards or backwards, to turn appropriately. The snippets that handle this are in Main.cpp, but are reproduced below for easy reference:
-
-	if (state == BACKWARD)
+```cpp
+if (state == BACKWARD)
+{
+	if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < TURN_THRESHOLD)
 	{
-		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
-		{
-			turnStraight();
-		}
-		else if (READINGS[LEFT_SENSOR] > 300
-			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 100))
-		{
-			turnLeft();
-		}
-		else if (READINGS[RIGHT_SENSOR] > 300
-			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 100))
-		{
-			turnRight();
-		}
-		else
-		{
-
-			if (direction == 0)
-			{
-				turnLeft();
-			}
-			else if (direction == 1)
-			{
-				turnRight();
-			}
-			else
-			{
-				turnStraight();
-			}
-		}
+		turnStraight();
+	}
+	else if (READINGS[LEFT_SENSOR] > TURN_BOUNDARY
+		&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - TURN_THRESHOLD)
+		&& abs(controller.state.output) > THROTTLE_THRESHOLD)
+	{
+		turnLeft();
+	}
+	else if (READINGS[RIGHT_SENSOR] > TURN_BOUNDARY
+		&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - TURN_THRESHOLD)
+		&& abs(controller.state.output) > THROTTLE_THRESHOLD)
+	{
+		turnRight();
 	}
 	else
 	{
 
-		
-		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
-		{
-			turnStraight();
-		}
-		else if (READINGS[LEFT_SENSOR] > 250
-			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 80))
-		{
-			turnRight();
-		}
-		else if (READINGS[RIGHT_SENSOR] > 250
-			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 80 ))
+		if (direction == 0)
 		{
 			turnLeft();
+		}
+		else if (direction == 1)
+		{
+			turnRight();
 		}
 		else
 		{
 			turnStraight();
 		}
-		
 	}
 
+
+	controller.updateResponse(1.0 * READINGS[REAR_SENSOR]);
+}
+else
+{
+
+		
+	if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < TURN_THRESHOLD)
+	{
+		turnStraight();
+	}
+	else if (READINGS[LEFT_SENSOR] > TURN_BOUNDARY
+		&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - TURN_THRESHOLD)
+		&& abs(controller.state.output) > THROTTLE_THRESHOLD)
+	{
+		turnRight();
+	}
+	else if (READINGS[RIGHT_SENSOR] > TURN_BOUNDARY
+		&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - TURN_THRESHOLD)
+		&& abs(controller.state.output) > THROTTLE_THRESHOLD)
+	{
+		turnLeft();
+	}
+	else
+	{
+		turnStraight();
+	}
+
+	controller.updateResponse(1.0 * READINGS[FWD_SENSOR]);
+		
+}
+
+if (controller.state.output > 0)
+{
+	driveForward(controller.state.output);
+}
+else
+{
+	driveBackward(abs(controller.state.output));
+}
+```
 ###3. Stuck Detection
 
 Now, how do we tell if we get stuck? There are smarter ways of doing it, but the way we implemented it is like this:
 
 First, we keep a log of all the most recent wheel readings (1000 of them). Then, we check all the readings against the first one. If they're all the same, that means the wheel isn't spinning (e.g., the sensor isn't reading white and then black and then white and then black from the front wheel).
-
-		wheel_reading = 0;
-		int first_reading = WHEEL_READINGS[0];
-		oldstate = state;
-		state = oldstate;
-		stopped = true;
-		for (int i = 1; i < 1000; i++)
-		{
-			if (WHEEL_READINGS[i] > first_reading + 30
-				|| WHEEL_READINGS[i] < first_reading - 30)
-			{
-				stopped = false;
-				break;
-			}
-		}
-
+```cpp
+wheel_reading = 0;
+int first_reading = WHEEL_READINGS[0];
+stopped = true;
+for (int i = 1; i < WREADING_BUF_SIZE; i++)
+{
+	if (WHEEL_READINGS[i] > first_reading + WREADING_THRESHOLD
+		|| WHEEL_READINGS[i] < first_reading - WREADING_THRESHOLD)
+	{
+		stopped = false;
+		break;
+	}
+}
+```
 If we detect we're stopped, we'll reverse the direction. If the new direction happens to be backwards, we'll choose a random direction out of three to turn (so we don't get stuck again when we start moving forwards). 
+```cpp
+if (stopped)
+{
+	stopped = false;
+	//if there's space to reverse, go backwards, otherwise go forward
+	if (state == FORWARD)
+	{
+		state = BACKWARD;
+	}
+	else
+	{
+		state = FORWARD;
+	}
+	direction = rand() / 10922.0;
+	controller.reverseControllerMode();
 
-		if (stopped)
-		{
-			stopped = false;
-			//if there's space to reverse, go backwards, otherwise go forward
-			if (state == FORWARD)
-			{
-				state = BACKWARD;
-			}
-			else
-			{
-				state = FORWARD;
-			}
-			direction = rand() / 10922.0;
-			controller.reverseControllerMode();
-
-		}
-
+}
+```
 
 ##Conclusion
 

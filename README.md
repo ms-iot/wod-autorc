@@ -9,6 +9,12 @@ When you've built it, share your design with us, along with a video of it workin
 
 But lets get right into it. This is how we built our car.
 
+##Contents
+- [The Supplies](#The-Supplies)
+- [The Smarts (and the Software)](#The-Smarts-(and-the-Software))
+- [Conclusion](#Conclusion)
+
+
 ##The Supplies
 
 We started with a car. Specifically a toy car. More specifically, a replica red (everyone knows red cars go faster) [Ford Mustang 1967 by Maisto Tech](http://www.amazon.com/Maisto-1967-Mustang-Colors-Styles/dp/B000FJEM14), complete with a racing stripe (and everyone knows cars with racing stripes are faster).
@@ -175,7 +181,7 @@ If you're having trouble wrapping your head around what the median filter does, 
 
 If you want to play around with this data, you can see the JavaScript snippet that we used to generate the example data, available in example-snippets/.
 
-##1. Front/Back Controll (PID)
+###1. Front/Back Control (PID)
 
 PID controllers (Proportional-Integral-Derivative), if you've never heard of them, are some of the most commonly implemented controllers in existence. PID Controllers can be found in the guts of nuclear reactors, heating and cooling systems, toys, robots, military helicopters and jets, and so much more. 
 
@@ -221,3 +227,114 @@ Here's the response of the car, based on the final parameters we chose.
 ![Final Car Behaviour](/images/final.png "Final Car Behaviour")
 
 At the end of the day, parameter tuning is a very challenging problem, especially when batteries start to drain, or when conditions change. We'd love to see what solutions you come up with -- whether it be an algorithm that auto-tunes your parameters, or a car that can detect conditions and use different parameter presets automatically! 
+
+###2. Left/Right Control
+
+Steering is pretty straightforward. We compare the value of one of the L/R sensors with that of the other. If one of them is big enough, and there's enough clearance to turn (i.e., one of them is small, the other is big), and the car is actually moving (no point turning the wheels if we're stopped), then we turn in the appropriate direction.
+
+There's also a check to see if we're moving forwards or backwards, to turn appropriately. The snippets that handle this are in Main.cpp, but are reproduced below for easy reference:
+
+	if (state == BACKWARD)
+	{
+		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
+		{
+			turnStraight();
+		}
+		else if (READINGS[LEFT_SENSOR] > 300
+			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 100))
+		{
+			turnLeft();
+		}
+		else if (READINGS[RIGHT_SENSOR] > 300
+			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 100))
+		{
+			turnRight();
+		}
+		else
+		{
+
+			if (direction == 0)
+			{
+				turnLeft();
+			}
+			else if (direction == 1)
+			{
+				turnRight();
+			}
+			else
+			{
+				turnStraight();
+			}
+		}
+	}
+	else
+	{
+
+		
+		if (abs(READINGS[RIGHT_SENSOR] - READINGS[LEFT_SENSOR]) < 50)
+		{
+			turnStraight();
+		}
+		else if (READINGS[LEFT_SENSOR] > 250
+			&& READINGS[RIGHT_SENSOR] < (READINGS[LEFT_SENSOR] - 80))
+		{
+			turnRight();
+		}
+		else if (READINGS[RIGHT_SENSOR] > 250
+			&& READINGS[LEFT_SENSOR] < (READINGS[RIGHT_SENSOR] - 80 ))
+		{
+			turnLeft();
+		}
+		else
+		{
+			turnStraight();
+		}
+		
+	}
+
+###3. Stuck Detection
+
+Now, how do we tell if we get stuck? There are smarter ways of doing it, but the way we implemented it is like this:
+
+First, we keep a log of all the most recent wheel readings (1000 of them). Then, we check all the readings against the first one. If they're all the same, that means the wheel isn't spinning (e.g., the sensor isn't reading white and then black and then white and then black from the front wheel).
+
+		wheel_reading = 0;
+		int first_reading = WHEEL_READINGS[0];
+		oldstate = state;
+		state = oldstate;
+		stopped = true;
+		for (int i = 1; i < 1000; i++)
+		{
+			if (WHEEL_READINGS[i] > first_reading + 30
+				|| WHEEL_READINGS[i] < first_reading - 30)
+			{
+				stopped = false;
+				break;
+			}
+		}
+
+If we detect we're stopped, we'll reverse the direction. If the new direction happens to be backwards, we'll choose a random direction out of three to turn (so we don't get stuck again when we start moving forwards). 
+
+		if (stopped)
+		{
+			stopped = false;
+			//if there's space to reverse, go backwards, otherwise go forward
+			if (state == FORWARD)
+			{
+				state = BACKWARD;
+			}
+			else
+			{
+				state = FORWARD;
+			}
+			direction = rand() / 10922.0;
+			controller.reverseControllerMode();
+
+		}
+
+
+##Conclusion
+
+Hopefully this writeup helps you in getting started on your very own autonomous car (big or small, we're excited to see either!). We'd love to see your creations, and hear about your ideas or potential tweaks. 
+
+Feel free to fork this repository and use it as a starting point, or make your very own! 

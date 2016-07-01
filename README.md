@@ -354,3 +354,9 @@ if (stopped)
 Hopefully this writeup helps you in getting started on your very own autonomous car (big or small, we're excited to see either!). We'd love to see your creations, and hear about your ideas or potential tweaks. 
 
 Feel free to fork this repository and use it as a starting point, or make your very own! 
+
+
+
+===
+
+This project has adopted the [Microsoft Open Source Code of Conduct](http://microsoft.github.io/codeofconduct). For more information see the [Code of Conduct FAQ](http://microsoft.github.io/codeofconduct/faq.md) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments. 
